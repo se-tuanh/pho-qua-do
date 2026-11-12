@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Phố Quá Độ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Game xây phố học Chủ nghĩa xã hội khoa học: mỗi chương giáo trình là một công trình, trả lời đúng để xây.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Lexend:wght@300;400;500;600&display=swap">
+<style>
+/* Layout: bàn vẽ quy hoạch. Bản đồ đẳng cự chiếm phần lớn, hồ sơ công trình là tờ phiếu kẹp bên phải. */
+:root{
+  --board:#e9eff3;      /* phim vẽ kỹ thuật */
+  --grid:#cddbe5;
+  --ink:#1b2a41;
+  --muted:#5d6b80;
+  --line:#d3dde6;
+  --sheet:#fbfcfd;
+  --blue:#2d6cdf;       /* nét quy hoạch */
+  --signal:#f2b632;     /* vàng công trường */
+  --ok:#2e8b57;
+  --bad:#c0392b;
+  --road:#c9d1d9;
+  --f-label:"Barlow Condensed","Arial Narrow",sans-serif;
+  --f-body:"Lexend","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --board:#0f1d33; --grid:#1d3150; --ink:#e6edf6; --muted:#9db0c8; --line:#22385a; --sheet:#132640; --blue:#6aa4ff; --road:#2b3d57; --ok:#55c08a; --bad:#ff7a6b; color-scheme:dark; }
+}
+:root[data-theme="dark"]{ --board:#0f1d33; --grid:#1d3150; --ink:#e6edf6; --muted:#9db0c8; --line:#22385a; --sheet:#132640; --blue:#6aa4ff; --road:#2b3d57; --ok:#55c08a; --bad:#ff7a6b; color-scheme:dark; }
+*{box-sizing:border-box}
+body{margin:0;background:var(--board);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:40;background:var(--board)}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px}
+h1,h2,h3{margin:0;font-weight:600;text-wrap:balance}
+p{margin:0}
+
+/* ---------- Đầu trang ---------- */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--board);border-bottom:1px solid var(--line);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top .in{max-width:1440px;margin:0 auto;display:flex;align-items:center;gap:18px;min-height:58px;flex-wrap:wrap;padding-block:6px}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{font-family:var(--f-label);font-weight:700;font-size:1.7rem;letter-spacing:.02em;text-transform:uppercase;line-height:1}
+.brand small{font-family:var(--f-label);font-size:.95rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.prog{display:flex;align-items:center;gap:10px;margin-left:auto}
+.prog .bar{display:flex;gap:3px}
+.prog .bar i{width:22px;height:8px;border-radius:2px;background:var(--line)}
+.prog .bar i.half{background:linear-gradient(90deg,var(--signal) 50%,var(--line) 50%)}
+.prog .bar i.done{background:var(--ok)}
+.prog b{font-family:var(--f-label);font-size:1.15rem;letter-spacing:.03em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.icon-btn{border:1px solid var(--line);background:transparent;border-radius:6px;padding:6px 10px;font-size:.85rem;color:var(--muted)}
+.icon-btn:hover{color:var(--ink);border-color:var(--ink)}
+
+/* ---------- Bàn vẽ ---------- */
+.desk{max-width:1440px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:0;align-items:start;padding-left:max(0px,env(safe-area-inset-left,0px));padding-right:max(0px,env(safe-area-inset-right,0px))}
+.map-wrap{position:relative;padding:18px 16px 24px;min-width:0}
+.map-wrap svg{display:block;width:100%;height:auto;max-height:calc(100vh - 110px)}
+.stamp{position:absolute;left:24px;bottom:22px;font-family:var(--f-label);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-size:.85rem;border:1.5px solid var(--muted);padding:4px 10px;border-radius:3px;pointer-events:none;opacity:.8}
+.stamp b{color:var(--ink);font-weight:700}
+
+/* lớp bản đồ */
+.plate{fill:color-mix(in srgb,var(--board) 70%,#fff)}
+:root[data-theme="dark"] .plate{fill:color-mix(in srgb,var(--board) 82%,#fff)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .plate{fill:color-mix(in srgb,var(--board) 82%,#fff)} }
+.gridln{stroke:var(--grid);stroke-width:1}
+.road{fill:var(--road)}
+.roadmark{stroke:color-mix(in srgb,var(--road) 40%,#fff);stroke-width:1.4;stroke-dasharray:6 7;fill:none}
+.pad{fill:color-mix(in srgb,var(--blue) 9%,transparent);stroke:var(--blue);stroke-width:1.4;stroke-dasharray:5 4}
+.wire{fill:none;stroke:var(--blue);stroke-width:1;stroke-dasharray:3 3;opacity:.8}
+.plot{cursor:pointer}
+.plot:hover .pad,.plot.sel .pad{fill:color-mix(in srgb,var(--blue) 18%,transparent);stroke-width:2}
+.plot:focus{outline:none}
+.plot:focus-visible .pad{stroke:var(--signal);stroke-width:2.5}
+.f{stroke:rgba(20,28,40,.35);stroke-width:.6;stroke-linejoin:round}
+.scaf{stroke:#d19a1e;stroke-width:1.3;fill:none}
+.win{fill:#7fa6c9}
+.smoke{fill:#cfd6dd;opacity:.75}
+.pin circle{stroke:#fff;stroke-width:2}
+.pin text{font-family:var(--f-label);font-weight:700;font-size:15px;fill:#fff;text-anchor:middle;pointer-events:none}
+.pin .tag rect{fill:var(--ink)}
+.pin .tag text{fill:var(--board);font-size:13px;letter-spacing:.04em}
+.pin .tag{opacity:0;transition:opacity .2s}
+.plot:hover .pin .tag,.plot.sel .pin .tag{opacity:1}
+.tree-c{stroke:rgba(0,0,0,.12);stroke-width:.6}
+.lamp{fill:#fff6cf;opacity:0}
+.night .f{filter:brightness(.5) saturate(.85)}
+.night .tree-c,.night .trunk{filter:brightness(.45)}
+.night .plate{filter:brightness(.55)}
+.night .road{filter:brightness(.6)}
+.night .win{fill:#ffd66b}
+.night .lamp{opacity:1}
+.map-wrap{transition:background-color 1.2s}
+.map-wrap.night{background:#0b1426;border-radius:18px}
+.map-wrap.night .stamp{display:none}
+@keyframes rise{0%{transform:translateY(0);opacity:.75}100%{transform:translateY(-26px);opacity:0}}
+.smoke{animation:rise 3.2s linear infinite;transform-box:fill-box}
+@keyframes drop{0%{transform:translateY(-14px);opacity:0}100%{transform:none;opacity:1}}
+.just-built{animation:drop .55s cubic-bezier(.2,1.4,.5,1)}
+
+/* ---------- Phiếu hồ sơ ---------- */
+.sheet{position:sticky;top:calc(58px + env(safe-area-inset-top,0px));max-height:calc(100vh - 58px - env(safe-area-inset-top,0px));overflow:auto;background:var(--sheet);border-left:1px solid var(--line);padding:22px 24px 30px}
+.sheet .kicker{font-family:var(--f-label);text-transform:uppercase;letter-spacing:.12em;font-size:.9rem;color:var(--blue);font-weight:600}
+.sheet h2{font-family:var(--f-label);font-weight:700;font-size:2.1rem;line-height:1.02;letter-spacing:.01em;text-transform:uppercase;margin:6px 0 4px}
+.sheet .chap{color:var(--muted);font-size:.92rem}
+.stages{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:18px 0 6px}
+.stages div{border-top:4px solid var(--line);padding-top:6px;font-family:var(--f-label);text-transform:uppercase;letter-spacing:.06em;font-size:.88rem;color:var(--muted)}
+.stages div.on{border-color:var(--signal);color:var(--ink)}
+.stages div.done{border-color:var(--ok);color:var(--ink)}
+.tabs{display:flex;gap:4px;margin:18px 0 14px;border-bottom:1px solid var(--line)}
+.tabs{overflow-x:auto;scrollbar-width:none}
+.tabs button{border:0;background:transparent;padding:8px 2px;margin-right:14px;border-bottom:2px solid transparent;color:var(--muted);font-weight:500;white-space:nowrap;font-size:.92rem}
+.tabs button.on{border-color:var(--ink);color:var(--ink)}
+.facts{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.facts li{padding-left:16px;position:relative}
+.facts li::before{content:"";position:absolute;left:0;top:.62em;width:7px;height:7px;background:var(--blue);transform:rotate(45deg)}
+.facts small{color:var(--muted);font-size:.8rem;white-space:nowrap}
+.q{margin-top:4px}
+.q .qn{font-family:var(--f-label);text-transform:uppercase;letter-spacing:.08em;font-size:.9rem;color:var(--muted)}
+.q h3{font-size:1.08rem;font-weight:500;line-height:1.45;margin:6px 0 14px}
+.opts{display:grid;gap:8px}
+.opts button{display:grid;grid-template-columns:26px minmax(0,1fr);gap:8px;text-align:left;border:1px solid var(--line);background:var(--board);border-radius:8px;padding:10px 12px;line-height:1.45;transition:border-color .15s,background .15s}
+.opts button:hover:not(:disabled){border-color:var(--blue)}
+.opts button b{font-family:var(--f-label);font-size:1.05rem;color:var(--blue)}
+.opts button.right{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.opts button.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.opts button:disabled{cursor:default}
+.explain{margin-top:14px;padding:12px 14px;border-radius:8px;background:color-mix(in srgb,var(--signal) 14%,transparent);font-size:.93rem}
+.explain b{display:block;margin-bottom:3px}
+.act{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.btn{border:0;background:var(--ink);color:var(--board);border-radius:8px;padding:10px 16px;font-weight:500}
+.btn.alt{background:transparent;border:1px solid var(--line);color:var(--ink)}
+.btn:hover{filter:brightness(1.1)}
+.list{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:6px}
+.list button{width:100%;display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--board);border-radius:8px;padding:9px 12px}
+.list button:hover{border-color:var(--blue)}
+.list .n{font-family:var(--f-label);font-weight:700;font-size:1.25rem;color:var(--blue);text-align:center}
+.list .st{font-family:var(--f-label);text-transform:uppercase;letter-spacing:.06em;font-size:.8rem;color:var(--muted);white-space:nowrap}
+.list .st.done{color:var(--ok)}
+.list .st.half{color:#b7860b}
+.intro p{color:var(--muted);margin-top:10px}
+.report{margin-top:16px;border:1.5px solid var(--ink);border-radius:4px;padding:16px}
+.report h3{font-family:var(--f-label);text-transform:uppercase;letter-spacing:.06em;font-size:1.2rem}
+.report table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.88rem}
+.report td{padding:6px 0;border-bottom:1px dashed var(--line);vertical-align:top}
+.report td:last-child{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.plaque{margin-top:16px;padding:14px 16px;background:var(--ink);color:var(--board);border-radius:4px}
+.plaque h3{font-family:var(--f-label);text-transform:uppercase;letter-spacing:.08em;font-size:1.05rem;color:var(--signal)}
+.plaque ol{margin:8px 0 0;padding-left:20px;font-size:.9rem;display:grid;gap:3px}
+
+@media (max-width:960px){
+  .desk{grid-template-columns:minmax(0,1fr)}
+  .sheet{position:relative;top:auto;max-height:none;border-left:0;border-top:1px solid var(--line);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .map-wrap svg{max-height:none}
+  .prog .bar i{width:14px}
+  .stamp{display:none}
+}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div class="in">
+    <div class="brand"><h1>Phố Quá Độ</h1><small>MLN131 · Chủ nghĩa xã hội khoa học</small></div>
+    <div class="prog" aria-live="polite"><div class="bar" id="pbar"></div><b id="ptext">0/7 công trình</b></div>
+    <button class="icon-btn" id="resetBtn" type="button">Chơi lại</button>
+  </div>
+</header>
+
+<div class="desk">
+  <div class="map-wrap">
+    <svg id="map" role="group" aria-label="Bản đồ quy hoạch Phố Quá Độ"></svg>
+    <div class="stamp">Bản vẽ quy hoạch · <b>Tỷ lệ 7 chương</b></div>
+  </div>
+  <aside class="sheet" id="sheet" aria-live="polite"></aside>
+</div>
+
+<script>
+/* =========================================================
+   NỘI DUNG: theo Giáo trình Chủ nghĩa xã hội khoa học (MLN131)
+   Số trang ghi theo số in trong sách.
+   ========================================================= */
+const LOTS = [
+  { id:1, name:"Thư viện Tuyên Ngôn", chap:"Chương 1 · Nhập môn chủ nghĩa xã hội khoa học",
+    facts:[
+      ["Điều kiện kinh tế - xã hội: cách mạng công nghiệp phát triển, phong trào công nhân dệt Lion (Pháp, 1831 và 1834), phong trào Hiến chương (Anh), công nhân dệt Xilêdi (Đức, 1844).","tr.12-13"],
+      ["Tiền đề khoa học tự nhiên: học thuyết tiến hóa, định luật bảo toàn và chuyển hóa năng lượng, học thuyết tế bào. Tiền đề lý luận: triết học cổ điển Đức, kinh tế chính trị cổ điển Anh, chủ nghĩa xã hội không tưởng phê phán.","tr.14-15"],
+      ["Ba phát kiến vĩ đại của C. Mác và Ph. Ăngghen: chủ nghĩa duy vật lịch sử, học thuyết về giá trị thặng dư, học thuyết về sứ mệnh lịch sử toàn thế giới của giai cấp công nhân.","tr.19-20"],
+      ["Tuyên ngôn của Đảng Cộng sản (tháng 2/1848) đánh dấu sự ra đời của chủ nghĩa xã hội khoa học.","tr.20"]
+    ],
+    qs:[
+      {q:"Ba phát kiến vĩ đại của C. Mác và Ph. Ăngghen là gì?",
+       o:["Chủ nghĩa duy vật lịch sử, học thuyết về giá trị thặng dư, học thuyết về sứ mệnh lịch sử của giai cấp công nhân","Triết học cổ điển Đức, kinh tế chính trị cổ điển Anh, chủ nghĩa xã hội không tưởng","Học thuyết tiến hóa, định luật bảo toàn năng lượng, học thuyết tế bào","Phép biện chứng, nhận thức luận, học thuyết hình thái kinh tế - xã hội"], a:0,
+       e:"Phương án B là tiền đề lý luận, phương án C là tiền đề khoa học tự nhiên. Ba phát kiến là phương án A (tr.19-20)."},
+      {q:"Tác phẩm nào đánh dấu sự ra đời của chủ nghĩa xã hội khoa học?",
+       o:["Bộ Tư bản","Tuyên ngôn của Đảng Cộng sản (1848)","Chống Đuyrinh","Nhà nước và cách mạng"], a:1,
+       e:"Tuyên ngôn của Đảng Cộng sản công bố tháng 2/1848, được coi là cương lĩnh chính trị của phong trào cộng sản và công nhân quốc tế (tr.20-21)."},
+      {q:"Phong trào công nhân diễn ra năm 1831 và 1834 có tính chất chính trị rõ nét là của công nhân ở đâu?",
+       o:["Công nhân dệt Xilêdi (Đức)","Phong trào Hiến chương (Anh)","Công nhân dệt Lion (Pháp)","Công xã Pari (Pháp)"], a:2,
+       e:"Phong trào công nhân dệt thành phố Lion (Pháp) năm 1831 và 1834. Xilêdi là năm 1844, Công xã Pari là năm 1871 (tr.12-13)."},
+      {q:"Học thuyết về giá trị thặng dư khẳng định sự diệt vong không tránh khỏi của chủ nghĩa tư bản về phương diện nào?",
+       o:["Triết học","Kinh tế","Chính trị - xã hội","Văn hóa"], a:1,
+       e:"Chủ nghĩa duy vật lịch sử khẳng định về mặt triết học, học thuyết giá trị thặng dư về mặt kinh tế, phát kiến thứ ba về mặt chính trị - xã hội (tr.19-20)."},
+      {q:"Đâu là tiền đề khoa học tự nhiên cho sự ra đời của chủ nghĩa xã hội khoa học?",
+       o:["Học thuyết tiến hóa, định luật bảo toàn và chuyển hóa năng lượng, học thuyết tế bào","Thuyết tương đối, cơ học lượng tử, di truyền học","Cơ học Niutơn, hình học Ơclít, thiên văn học Côpécních","Hóa học hữu cơ, điện từ học, địa chất học"], a:0,
+       e:"Ba phát minh: học thuyết tiến hóa (Darwin), định luật bảo toàn và chuyển hóa năng lượng, học thuyết tế bào (tr.14)."}
+    ]},
+  { id:2, name:"Nhà máy Tiên Phong", chap:"Chương 2 · Sứ mệnh lịch sử của giai cấp công nhân",
+    facts:[
+      ["Giai cấp công nhân là con đẻ của nền đại công nghiệp, đại biểu cho lực lượng sản xuất tiên tiến; lao động bằng phương thức công nghiệp, bị bóc lột giá trị thặng dư.","tr.55-56"],
+      ["Sứ mệnh lịch sử thể hiện trên ba nội dung: kinh tế; chính trị - xã hội; văn hóa, tư tưởng.","tr.57-59"],
+      ["Trên lĩnh vực văn hóa, tư tưởng, giai cấp công nhân xây dựng hệ giá trị mới: lao động, công bằng, dân chủ, bình đẳng và tự do.","tr.59"],
+      ["Giai cấp công nhân là giai cấp cách mạng vì đại biểu cho lực lượng sản xuất hiện đại và cho tương lai, hoàn toàn không phải vì nghèo khổ.","tr.62"],
+      ["Đảng Cộng sản là nhân tố chủ quan quan trọng nhất để giai cấp công nhân thực hiện thắng lợi sứ mệnh lịch sử.","tr.63"]
+    ],
+    qs:[
+      {q:"Sứ mệnh lịch sử của giai cấp công nhân thể hiện trên mấy nội dung cơ bản?",
+       o:["Hai: kinh tế và chính trị","Ba: kinh tế; chính trị - xã hội; văn hóa, tư tưởng","Bốn: kinh tế, chính trị, văn hóa, quốc phòng","Năm: kinh tế, chính trị, văn hóa, xã hội, đối ngoại"], a:1,
+       e:"Giáo trình nêu ba nội dung: kinh tế; chính trị - xã hội; văn hóa, tư tưởng (tr.57-59)."},
+      {q:"Theo giáo trình, vì sao giai cấp công nhân là giai cấp cách mạng?",
+       o:["Vì họ nghèo khổ nhất trong xã hội","Vì họ đông nhất trong dân cư","Vì họ đại biểu cho lực lượng sản xuất hiện đại, phương thức sản xuất tiên tiến và cho tương lai","Vì họ bị bóc lột nặng nề hơn nông dân"], a:2,
+       e:"Giáo trình viết rõ: hoàn toàn không phải vì nghèo khổ mà giai cấp công nhân là một giai cấp cách mạng (tr.62)."},
+      {q:"Nhân tố chủ quan quan trọng nhất để giai cấp công nhân thực hiện thắng lợi sứ mệnh lịch sử là gì?",
+       o:["Sự phát triển về số lượng công nhân","Đảng Cộng sản","Liên minh với giai cấp nông dân","Sự giúp đỡ của quốc tế"], a:1,
+       e:"Đảng Cộng sản, đội tiền phong của giai cấp công nhân, là nhân tố chủ quan quan trọng nhất (tr.63)."},
+      {q:"Đặc điểm nổi bật của giai cấp công nhân là gì?",
+       o:["Lao động bằng phương thức công nghiệp với công cụ là máy móc, năng suất cao, mang tính xã hội hóa","Sở hữu tư liệu sản xuất nhỏ","Làm việc chủ yếu trong nông nghiệp","Có thu nhập cao nhất xã hội"], a:0,
+       e:"Đặc điểm nổi bật: lao động bằng phương thức công nghiệp, công cụ là máy móc, quá trình lao động mang tính xã hội hóa (tr.56)."},
+      {q:"Trên lĩnh vực văn hóa, tư tưởng, giai cấp công nhân tập trung xây dựng hệ giá trị mới nào?",
+       o:["Lao động; công bằng; dân chủ; bình đẳng và tự do","Cạnh tranh; lợi nhuận; hiệu quả","Trung, hiếu, lễ, nghĩa","Tự do cá nhân tuyệt đối"], a:0,
+       e:"Hệ giá trị mới: lao động; công bằng; dân chủ; bình đẳng và tự do (tr.59)."}
+    ]},
+  { id:3, name:"Quảng trường Quá Độ", chap:"Chương 3 · Chủ nghĩa xã hội và thời kỳ quá độ",
+    facts:[
+      ["Thời kỳ quá độ là thời kỳ cải biến cách mạng sâu sắc, triệt để trên mọi lĩnh vực; lâu dài, gian khổ. Về kinh tế, tất yếu tồn tại nền kinh tế nhiều thành phần (V.I. Lênin nêu 5 thành phần ở nước Nga).","tr.107-108"],
+      ["Việt Nam quá độ bỏ qua chế độ tư bản chủ nghĩa, tức là bỏ qua việc xác lập vị trí thống trị của quan hệ sản xuất và kiến trúc thượng tầng tư bản chủ nghĩa, nhưng tiếp thu, kế thừa thành tựu nhân loại.","tr.111-112"],
+      ["Cương lĩnh 1991 nêu 6 đặc trưng; Cương lĩnh bổ sung, phát triển năm 2011 nêu 8 đặc trưng của chủ nghĩa xã hội Việt Nam, mở đầu là: dân giàu, nước mạnh, dân chủ, công bằng, văn minh.","tr.113-114"]
+    ],
+    qs:[
+      {q:"Cương lĩnh xây dựng đất nước (bổ sung, phát triển năm 2011) xác định chủ nghĩa xã hội Việt Nam có bao nhiêu đặc trưng?",
+       o:["6","7","8","10"], a:2,
+       e:"Cương lĩnh 1991 có 6 đặc trưng, Cương lĩnh 2011 phát triển thành 8 đặc trưng (tr.113-114)."},
+      {q:"\"Bỏ qua chế độ tư bản chủ nghĩa\" ở Việt Nam được hiểu là gì?",
+       o:["Bỏ qua toàn bộ những gì chủ nghĩa tư bản tạo ra","Bỏ qua việc xác lập vị trí thống trị của quan hệ sản xuất và kiến trúc thượng tầng tư bản chủ nghĩa","Không cho phép kinh tế tư nhân tồn tại","Không giao lưu với các nước tư bản"], a:1,
+       e:"Đồng thời phải tiếp thu, kế thừa những thành tựu nhân loại đạt được dưới chủ nghĩa tư bản, nhất là khoa học và công nghệ (tr.111-112)."},
+      {q:"Về kinh tế, đặc điểm của thời kỳ quá độ lên chủ nghĩa xã hội là gì?",
+       o:["Chỉ còn thành phần kinh tế nhà nước","Tồn tại nền kinh tế nhiều thành phần, trong đó có thành phần đối lập","Kinh tế tư bản giữ vai trò chủ đạo","Xóa bỏ ngay mọi hình thức sở hữu tư nhân"], a:1,
+       e:"Thời kỳ quá độ tất yếu tồn tại nền kinh tế nhiều thành phần, trong đó có thành phần đối lập (tr.107)."},
+      {q:"Theo V.I. Lênin, thời kỳ quá độ ở nước Nga tồn tại bao nhiêu thành phần kinh tế?",
+       o:["3","4","5","6"], a:2,
+       e:"Năm thành phần: kinh tế gia trưởng, kinh tế hàng hóa nhỏ, kinh tế tư bản, kinh tế tư bản nhà nước, kinh tế xã hội chủ nghĩa (tr.108)."},
+      {q:"Đặc trưng nào có trong Cương lĩnh 2011 nhưng không có trong 6 đặc trưng của Cương lĩnh 1991?",
+       o:["Do nhân dân làm chủ","Có nền văn hóa tiên tiến, đậm đà bản sắc dân tộc","Dân giàu, nước mạnh, dân chủ, công bằng, văn minh","Có quan hệ hữu nghị và hợp tác với các nước"], a:2,
+       e:"Hai đặc trưng mới của năm 2011: dân giàu, nước mạnh, dân chủ, công bằng, văn minh; và có Nhà nước pháp quyền XHCN của nhân dân, do nhân dân, vì nhân dân (tr.113-114)."}
+    ]},
+  { id:4, name:"Hội trường Nhân Dân", chap:"Chương 4 · Dân chủ XHCN và nhà nước XHCN",
+    facts:[
+      ["Lịch sử có ba nền dân chủ: chủ nô, tư sản, xã hội chủ nghĩa. Dân chủ XHCN phôi thai từ Công xã Pari 1871, chính thức xác lập từ Cách mạng Tháng Mười Nga 1917.","tr.132-133"],
+      ["Nhà nước XHCN mang bản chất giai cấp công nhân; là \"nửa nhà nước\", vừa là bộ máy chính trị - hành chính vừa là tổ chức quản lý kinh tế - xã hội của nhân dân lao động.","tr.143-144"],
+      ["Căn cứ tính chất quyền lực, chức năng nhà nước gồm chức năng giai cấp (trấn áp) và chức năng xã hội (tổ chức, xây dựng).","tr.145"],
+      ["Nhà nước pháp quyền XHCN Việt Nam: quyền lực nhà nước là thống nhất, có phân công, phối hợp, kiểm soát giữa lập pháp, hành pháp, tư pháp; nhân dân giám sát theo phương châm \"Dân biết, dân bàn, dân làm, dân kiểm tra\".","tr.157-158"]
+    ],
+    qs:[
+      {q:"Trong lịch sử, đến nay có mấy nền (chế độ) dân chủ?",
+       o:["Hai: tư sản và xã hội chủ nghĩa","Ba: chủ nô, tư sản, xã hội chủ nghĩa","Bốn: nguyên thủy, chủ nô, phong kiến, tư sản","Năm nền dân chủ"], a:1,
+       e:"Ba nền dân chủ: chủ nô, tư sản, xã hội chủ nghĩa (tr.132)."},
+      {q:"Nền dân chủ xã hội chủ nghĩa chính thức được xác lập khi nào?",
+       o:["Công xã Pari năm 1871","Cách mạng Tháng Mười Nga năm 1917","Sau Chiến tranh thế giới thứ hai","Năm 1945 ở Việt Nam"], a:1,
+       e:"Dân chủ XHCN phôi thai từ Công xã Pari 1871, nhưng chính thức xác lập khi Cách mạng Tháng Mười Nga thành công năm 1917 (tr.133)."},
+      {q:"Quyền lực nhà nước trong Nhà nước pháp quyền XHCN Việt Nam được tổ chức theo nguyên tắc nào?",
+       o:["Tam quyền phân lập, ba quyền độc lập và đối trọng nhau","Quyền lực thống nhất, có phân công, phối hợp và kiểm soát giữa lập pháp, hành pháp, tư pháp","Quyền lực tập trung tuyệt đối vào cơ quan hành pháp","Mỗi địa phương có quyền lập pháp riêng"], a:1,
+       e:"Quyền lực nhà nước là thống nhất, có sự phân công rõ ràng, phối hợp và kiểm soát giữa các cơ quan lập pháp, hành pháp, tư pháp (tr.157-158)."},
+      {q:"Hoạt động của Nhà nước pháp quyền XHCN Việt Nam được nhân dân giám sát theo phương châm nào?",
+       o:["Dân biết, dân bàn, dân làm, dân kiểm tra","Dân giàu, nước mạnh","Đoàn kết, đoàn kết, đại đoàn kết","Tự do, bình đẳng, bác ái"], a:0,
+       e:"Phương châm \"Dân biết, dân bàn, dân làm, dân kiểm tra\" (tr.158)."},
+      {q:"Căn cứ vào tính chất của quyền lực, chức năng của nhà nước XHCN được chia thành những chức năng nào?",
+       o:["Đối nội và đối ngoại","Chính trị, kinh tế, văn hóa, xã hội","Chức năng giai cấp (trấn áp) và chức năng xã hội (tổ chức và xây dựng)","Lập pháp, hành pháp, tư pháp"], a:2,
+       e:"Đối nội - đối ngoại là theo phạm vi; chính trị, kinh tế, văn hóa, xã hội là theo lĩnh vực; theo tính chất là giai cấp và xã hội (tr.144-145)."}
+    ]},
+  { id:5, name:"Khu Liên Minh", chap:"Chương 5 · Cơ cấu xã hội - giai cấp và liên minh giai cấp, tầng lớp",
+    facts:[
+      ["Cơ cấu xã hội - giai cấp là hệ thống các giai cấp, tầng lớp tồn tại khách quan, thông qua quan hệ về sở hữu tư liệu sản xuất, tổ chức quản lý sản xuất, địa vị chính trị - xã hội.","tr.166"],
+      ["C. Mác và Ph. Ăngghen chỉ ra: nhiều cuộc đấu tranh của công nhân thất bại vì \"đơn độc\", không liên minh với \"người bạn đồng minh tự nhiên\" là nông dân.","tr.173"],
+      ["Ở Việt Nam, nền tảng là liên minh giai cấp công nhân với giai cấp nông dân và đội ngũ trí thức do Đảng lãnh đạo.","tr.182-183"],
+      ["Liên minh có ba nội dung: kinh tế (cơ bản, quyết định nhất), chính trị, văn hóa - xã hội.","tr.183-186"]
+    ],
+    qs:[
+      {q:"Nội dung nào là nội dung cơ bản, quyết định nhất của liên minh giai cấp, tầng lớp trong thời kỳ quá độ?",
+       o:["Nội dung chính trị","Nội dung kinh tế","Nội dung văn hóa - xã hội","Nội dung quốc phòng"], a:1,
+       e:"Nội dung kinh tế là cơ bản, quyết định nhất, là cơ sở vật chất - kỹ thuật của liên minh (tr.183)."},
+      {q:"Theo C. Mác và Ph. Ăngghen, vì sao nhiều cuộc đấu tranh của giai cấp công nhân ở châu Âu thất bại?",
+       o:["Vì thiếu vũ khí","Vì công nhân \"đơn độc\", không liên minh với giai cấp nông dân","Vì không có lãnh tụ","Vì kinh tế chưa phát triển"], a:1,
+       e:"Công nhân đã không liên minh với \"người bạn đồng minh tự nhiên\" là nông dân, nên các cuộc đấu tranh trở thành \"bài ai điếu\" (tr.173)."},
+      {q:"Nền tảng của khối liên minh ở Việt Nam trong thời kỳ quá độ gồm những lực lượng nào?",
+       o:["Công nhân, nông dân, đội ngũ trí thức do Đảng lãnh đạo","Công nhân và doanh nhân","Nông dân và thanh niên","Trí thức và quân đội"], a:0,
+       e:"Liên minh giai cấp công nhân với giai cấp nông dân và đội ngũ trí thức do Đảng lãnh đạo (tr.182-183)."},
+      {q:"Cơ cấu xã hội - giai cấp được xác định thông qua những mối quan hệ nào?",
+       o:["Quan hệ huyết thống và hôn nhân","Sở hữu tư liệu sản xuất, tổ chức quản lý sản xuất, địa vị chính trị - xã hội","Quan hệ tôn giáo và dân tộc","Quan hệ vùng miền"], a:1,
+       e:"Thông qua quan hệ về sở hữu tư liệu sản xuất, tổ chức quản lý quá trình sản xuất, địa vị chính trị - xã hội (tr.166)."},
+      {q:"V.I. Lênin viết: \"Trước sự liên minh của các đại biểu khoa học, giai cấp vô sản và giới kỹ thuật, không một thế lực đen tối nào đứng vững được\". Câu này nhấn mạnh vai trò của ai?",
+       o:["Nông dân","Doanh nhân","Trí thức","Quân đội"], a:2,
+       e:"Câu nói khẳng định vai trò của trí thức trong khối liên minh (tr.175)."}
+    ]},
+  { id:6, name:"Làng Đoàn Kết", chap:"Chương 6 · Vấn đề dân tộc và tôn giáo",
+    facts:[
+      ["Hai xu hướng khách quan: các cộng đồng muốn tách ra thành dân tộc độc lập; các dân tộc muốn liên hiệp lại với nhau.","tr.201-202"],
+      ["Cương lĩnh dân tộc của chủ nghĩa Mác - Lênin: các dân tộc hoàn toàn bình đẳng; các dân tộc được quyền tự quyết; liên hiệp công nhân tất cả các dân tộc.","tr.204"],
+      ["Việt Nam có 54 dân tộc; dân tộc Kinh chiếm 85,3%. Các dân tộc cư trú xen kẽ, có truyền thống đoàn kết lâu đời, mỗi dân tộc có bản sắc văn hóa riêng.","tr.206-209"],
+      ["Tôn giáo có ba nguồn gốc (tự nhiên, kinh tế - xã hội; nhận thức; tâm lý) và ba tính chất (lịch sử, quần chúng, chính trị). Việt Nam có 43 tổ chức thuộc 16 tôn giáo được công nhận.","tr.216-223"]
+    ],
+    qs:[
+      {q:"Cương lĩnh dân tộc của chủ nghĩa Mác - Lênin gồm những nội dung nào?",
+       o:["Các dân tộc hoàn toàn bình đẳng; được quyền tự quyết; liên hiệp công nhân tất cả các dân tộc","Dân tộc lớn giúp dân tộc nhỏ; đồng hóa văn hóa; thống nhất ngôn ngữ","Tự do kinh doanh; tự do di cư; tự do tôn giáo","Độc lập; tự chủ; hội nhập"], a:0,
+       e:"Ba nội dung: bình đẳng, quyền tự quyết, liên hiệp công nhân các dân tộc (tr.204)."},
+      {q:"Đặc trưng nào là quan trọng nhất của dân tộc (theo nghĩa quốc gia)?",
+       o:["Chung một vùng lãnh thổ","Chung một phương thức sinh hoạt kinh tế","Chung một ngôn ngữ","Chung một nhà nước"], a:1,
+       e:"Chung phương thức sinh hoạt kinh tế là đặc trưng quan trọng nhất, là cơ sở gắn kết các thành viên trong dân tộc (tr.197)."},
+      {q:"Theo giáo trình, tôn giáo có những nguồn gốc nào?",
+       o:["Chỉ có nguồn gốc tâm lý","Tự nhiên, kinh tế - xã hội; nhận thức; tâm lý","Chính trị; quân sự; ngoại giao","Di truyền; địa lý; khí hậu"], a:1,
+       e:"Ba nguồn gốc: tự nhiên, kinh tế - xã hội; nhận thức; tâm lý (tr.216-217)."},
+      {q:"Theo số liệu trong giáo trình, Việt Nam có bao nhiêu tổ chức tôn giáo được công nhận?",
+       o:["16 tổ chức thuộc 43 tôn giáo","43 tổ chức thuộc 16 tôn giáo","54 tổ chức thuộc 6 tôn giáo","13 tổ chức thuộc 13 tôn giáo"], a:1,
+       e:"43 tổ chức thuộc 16 tôn giáo đã được công nhận và cấp đăng ký hoạt động (tr.223)."},
+      {q:"Đâu là ba tính chất của tôn giáo?",
+       o:["Tính lịch sử, tính quần chúng, tính chính trị","Tính khoa học, tính cách mạng, tính nhân văn","Tính giai cấp, tính dân tộc, tính quốc tế","Tính thần bí, tính bảo thủ, tính cực đoan"], a:0,
+       e:"Tôn giáo có tính lịch sử, tính quần chúng và tính chính trị (tr.218-219)."}
+    ]},
+  { id:7, name:"Khu phố Gia Đình", chap:"Chương 7 · Vấn đề gia đình",
+    facts:[
+      ["Cơ sở hình thành gia đình là hai mối quan hệ cơ bản: quan hệ hôn nhân (vợ và chồng) và quan hệ huyết thống (cha mẹ và con cái).","tr.240"],
+      ["Gia đình là tế bào của xã hội; là tổ ấm mang lại hạnh phúc cho mỗi thành viên.","tr.241-243"],
+      ["Bốn chức năng cơ bản: tái sản xuất ra con người (chức năng đặc thù); nuôi dưỡng, giáo dục; kinh tế và tổ chức tiêu dùng; thỏa mãn nhu cầu tâm sinh lý, duy trì tình cảm.","tr.245-249"],
+      ["Cơ sở xây dựng gia đình trong thời kỳ quá độ: kinh tế - xã hội; chính trị - xã hội; văn hóa; chế độ hôn nhân tiến bộ (tự nguyện, một vợ một chồng và vợ chồng bình đẳng, được bảo đảm về pháp lý).","tr.250-256"]
+    ],
+    qs:[
+      {q:"Chức năng nào là chức năng đặc thù của gia đình, không một cộng đồng nào thay thế được?",
+       o:["Nuôi dưỡng, giáo dục","Tái sản xuất ra con người","Kinh tế và tổ chức tiêu dùng","Thỏa mãn nhu cầu tâm sinh lý"], a:1,
+       e:"Tái sản xuất ra con người là chức năng đặc thù của gia đình (tr.245)."},
+      {q:"Cơ sở hình thành gia đình là hai mối quan hệ cơ bản nào?",
+       o:["Quan hệ kinh tế và quan hệ chính trị","Quan hệ hôn nhân và quan hệ huyết thống","Quan hệ hàng xóm và quan hệ họ hàng","Quan hệ tình bạn và quan hệ đồng nghiệp"], a:1,
+       e:"Quan hệ hôn nhân (vợ và chồng) và quan hệ huyết thống (cha mẹ và con cái) (tr.240)."},
+      {q:"Chế độ hôn nhân tiến bộ gồm những nội dung nào?",
+       o:["Hôn nhân do cha mẹ sắp đặt","Hôn nhân tự nguyện; một vợ một chồng, vợ chồng bình đẳng; được bảo đảm về pháp lý","Hôn nhân chỉ cần tình yêu, không cần đăng ký","Hôn nhân theo môn đăng hộ đối"], a:1,
+       e:"Ba nội dung của chế độ hôn nhân tiến bộ (tr.254-256)."},
+      {q:"Cơ sở kinh tế - xã hội để xây dựng gia đình trong thời kỳ quá độ là gì?",
+       o:["Sự phát triển của lực lượng sản xuất và quan hệ sản xuất mới XHCN, cốt lõi là chế độ sở hữu XHCN về tư liệu sản xuất","Thu nhập bình quân đầu người cao","Mỗi gia đình có nhà riêng","Nhà nước bao cấp toàn bộ đời sống gia đình"], a:0,
+       e:"Nguồn gốc của áp bức, bất bình đẳng trong gia đình dần bị xóa bỏ, tạo cơ sở cho bình đẳng và giải phóng phụ nữ (tr.250)."},
+      {q:"Chức năng nào được giáo trình gọi là chức năng thường xuyên của gia đình?",
+       o:["Tái sản xuất ra con người","Kinh tế và tổ chức tiêu dùng","Thỏa mãn nhu cầu tâm sinh lý, duy trì tình cảm gia đình","Nuôi dưỡng, giáo dục"], a:2,
+       e:"Thỏa mãn nhu cầu tâm sinh lý, duy trì tình cảm là chức năng thường xuyên của gia đình (tr.249)."}
+    ]}
+];
+const FEATURES_2011 = [
+  "Dân giàu, nước mạnh, dân chủ, công bằng, văn minh",
+  "Do nhân dân làm chủ",
+  "Có nền kinh tế phát triển cao dựa trên lực lượng sản xuất hiện đại và quan hệ sản xuất tiến bộ phù hợp",
+  "Có nền văn hóa tiên tiến, đậm đà bản sắc dân tộc",
+  "Con người có cuộc sống ấm no, tự do, hạnh phúc, có điều kiện phát triển toàn diện",
+  "Các dân tộc trong cộng đồng Việt Nam bình đẳng, đoàn kết, tôn trọng và giúp nhau cùng phát triển",
+  "Có Nhà nước pháp quyền XHCN của nhân dân, do nhân dân, vì nhân dân do Đảng Cộng sản lãnh đạo",
+  "Có quan hệ hữu nghị và hợp tác với các nước trên thế giới"
+];
+const STAGE_NAMES = ["Đổ móng", "Dựng khung", "Hoàn thiện"];
+
+/* =========================================================
+   TRẠNG THÁI
+   ========================================================= */
+const KEY = 'pho-qua-do-v1';
+function fresh(){ const s = {stage:{}, ptr:{}, tries:{}, right:0, wrong:0}; LOTS.forEach(l => { s.stage[l.id] = 0; s.ptr[l.id] = 0; s.tries[l.id] = 0; }); return s; }
+let S = fresh();
+try{ const x = JSON.parse(localStorage.getItem(KEY) || 'null'); if(x && x.stage) S = Object.assign(fresh(), x); }catch(e){}
+const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} };
+const builtCount = () => LOTS.filter(l => S.stage[l.id] >= 3).length;
+
+/* =========================================================
+   VẼ ĐẲNG CỰ
+   ========================================================= */
+const SV = 30, CS = Math.cos(Math.PI/6), N = 14, PAD = 24, TOPH = 4;
+const OX = N*SV*CS + PAD, OY = PAD + TOPH*SV;
+const W = 2*N*SV*CS + 2*PAD, H = N*SV + TOPH*SV + 2*PAD;
+const P = (x,y,z=0) => [(x - y)*SV*CS + OX, (x + y)*SV*.5 - z*SV + OY];
+const pts = a => a.map(p => P(...p).map(v => v.toFixed(1)).join(',')).join(' ');
+const hex = h => [1,3,5].map(i => parseInt(h.slice(i,i+2),16));
+const shade = (h, k) => { const c = hex(h).map(v => Math.max(0, Math.min(255, Math.round(k > 0 ? v + (255-v)*k : v*(1+k))))); return '#' + c.map(v => v.toString(16).padStart(2,'0')).join(''); };
+const poly = (a, fill, cls='f') => `<polygon class="${cls}" points="${pts(a)}" fill="${fill}"/>`;
+
+function box(x,y,z,w,d,h,c,opt={}){
+  let s = '';
+  s += poly([[x,y,z+h],[x+w,y,z+h],[x+w,y+d,z+h],[x,y+d,z+h]], shade(c,.16));
+  s += poly([[x,y+d,z],[x+w,y+d,z],[x+w,y+d,z+h],[x,y+d,z+h]], c);
+  s += poly([[x+w,y,z],[x+w,y+d,z],[x+w,y+d,z+h],[x+w,y,z+h]], shade(c,-.2));
+  if(opt.win){
+    const [lc, lr] = opt.win.l || [0,0], [rc, rr] = opt.win.r || [0,0];
+    const wf = .42, hf = .5;
+    for(let i=0;i<lc;i++) for(let j=0;j<lr;j++){
+      const cw = w/lc, ch = h/lr, u = x + i*cw + cw*(1-wf)/2, v = z + j*ch + ch*.28;
+      s += poly([[u,y+d,v],[u+cw*wf,y+d,v],[u+cw*wf,y+d,v+ch*hf],[u,y+d,v+ch*hf]], '#7fa6c9', 'win');
+    }
+    for(let i=0;i<rc;i++) for(let j=0;j<rr;j++){
+      const cw = d/rc, ch = h/rr, u = y + i*cw + cw*(1-wf)/2, v = z + j*ch + ch*.28;
+      s += poly([[x+w,u,v],[x+w,u+cw*wf,v],[x+w,u+cw*wf,v+ch*hf],[x+w,u,v+ch*hf]], '#6f97ba', 'win');
+    }
+  }
+  return s;
+}
+function gableX(x,y,z,w,d,rh,c){ /* nóc chạy theo trục x */
+  return poly([[x,y+d,z],[x+w,y+d,z],[x+w,y+d/2,z+rh],[x,y+d/2,z+rh]], c)
+       + poly([[x+w,y,z],[x+w,y+d,z],[x+w,y+d/2,z+rh]], shade(c,-.22));
+}
+function gableY(x,y,z,w,d,rh,c){ /* nóc chạy theo trục y */
+  return poly([[x+w,y,z],[x+w,y+d,z],[x+w/2,y+d,z+rh],[x+w/2,y,z+rh]], shade(c,-.18))
+       + poly([[x,y+d,z],[x+w,y+d,z],[x+w/2,y+d,z+rh]], c);
+}
+function pyr(x,y,z,w,d,rh,c){
+  const ax = x+w/2, ay = y+d/2;
+  return poly([[x,y+d,z],[x+w,y+d,z],[ax,ay,z+rh]], c) + poly([[x+w,y,z],[x+w,y+d,z],[ax,ay,z+rh]], shade(c,-.22));
+}
+function wire(x,y,z,w,d,h){
+  const e = [[[x,y,z],[x+w,y,z]],[[x+w,y,z],[x+w,y+d,z]],[[x+w,y+d,z],[x,y+d,z]],[[x,y+d,z],[x,y,z]],
+             [[x,y,z+h],[x+w,y,z+h]],[[x+w,y,z+h],[x+w,y+d,z+h]],[[x+w,y+d,z+h],[x,y+d,z+h]],[[x,y+d,z+h],[x,y,z+h]],
+             [[x,y,z],[x,y,z+h]],[[x+w,y,z],[x+w,y,z+h]],[[x+w,y+d,z],[x+w,y+d,z+h]],[[x,y+d,z],[x,y+d,z+h]]];
+  return e.map(([a,b]) => { const A = P(...a), B = P(...b); return `<line class="wire" x1="${A[0].toFixed(1)}" y1="${A[1].toFixed(1)}" x2="${B[0].toFixed(1)}" y2="${B[1].toFixed(1)}"/>`; }).join('');
+}
+function scaffold(x,y,z,w,d,h){
+  const L = (a,b) => { const A = P(...a), B = P(...b); return `<line class="scaf" x1="${A[0].toFixed(1)}" y1="${A[1].toFixed(1)}" x2="${B[0].toFixed(1)}" y2="${B[1].toFixed(1)}"/>`; };
+  let s = ''; const o = .12;
+  [[x+w+o,y-o],[x+w+o,y+d+o],[x-o,y+d+o]].forEach(([a,b]) => s += L([a,b,z],[a,b,z+h+.25]));
+  for(let k=1;k<=Math.max(1,Math.round(h/.45));k++){ const zz = z + k*.45; if(zz > z+h+.2) break;
+    s += L([x+w+o,y-o,zz],[x+w+o,y+d+o,zz]) + L([x+w+o,y+d+o,zz],[x-o,y+d+o,zz]); }
+  return s;
+}
+function dome(cx,cy,z,r,c){
+  const [X,Y] = P(cx,cy,z), rx = r*SV*CS*1.15, ry = r*SV*.5*1.15, hh = r*SV*1.05;
+  return `<path class="f" fill="${c}" d="M${(X-rx).toFixed(1)},${Y.toFixed(1)} A${rx.toFixed(1)},${ry.toFixed(1)} 0 0 0 ${(X+rx).toFixed(1)},${Y.toFixed(1)} C${(X+rx).toFixed(1)},${(Y-hh*.9).toFixed(1)} ${(X+rx*.3).toFixed(1)},${(Y-hh*1.1).toFixed(1)} ${X.toFixed(1)},${(Y-hh*1.1).toFixed(1)} C${(X-rx*.3).toFixed(1)},${(Y-hh*1.1).toFixed(1)} ${(X-rx).toFixed(1)},${(Y-hh*.9).toFixed(1)} ${(X-rx).toFixed(1)},${Y.toFixed(1)} Z"/>`;
+}
+function flag(x,y,z,h,c){
+  const [X,Y] = P(x,y,z), top = Y - h*SV;
+  return `<line x1="${X.toFixed(1)}" y1="${Y.toFixed(1)}" x2="${X.toFixed(1)}" y2="${top.toFixed(1)}" stroke="#8a8f96" stroke-width="1.6"/>`
+       + `<path class="f" fill="${c}" d="M${X.toFixed(1)},${top.toFixed(1)} l18,3 l-1,11 l-17,-3 Z"/>`
+       + `<polygon points="${starPts(X+8.6, top+7.3, 3.4, 1.4)}" fill="#ffde00"/>`;
+}
+function starPts(cx,cy,R,r){ const a = []; for(let i=0;i<10;i++){ const k = i%2 ? r : R, t = -Math.PI/2 + i*Math.PI/5; a.push((cx + k*Math.cos(t)).toFixed(1) + ',' + (cy + k*Math.sin(t)).toFixed(1)); } return a.join(' '); }
+function field(x,y,w,d,c1,c2){
+  let s = poly([[x,y,.02],[x+w,y,.02],[x+w,y+d,.02],[x,y+d,.02]], c1);
+  for(let i=1;i<6;i++){ const yy = y + d*i/6; const A = P(x,yy,.03), B = P(x+w,yy,.03); s += `<line x1="${A[0].toFixed(1)}" y1="${A[1].toFixed(1)}" x2="${B[0].toFixed(1)}" y2="${B[1].toFixed(1)}" stroke="${c2}" stroke-width="1.2"/>`; }
+  return s;
+}
+function tree(x,y,r=.42,h=.9){
+  const [X,Y] = P(x,y,0), [, T] = P(x,y,h);
+  return `<line class="trunk" x1="${X}" y1="${Y}" x2="${X}" y2="${T+4}" stroke="#7b5b3e" stroke-width="2.4"/>`
+       + `<ellipse class="tree-c" cx="${X}" cy="${T}" rx="${(r*SV).toFixed(1)}" ry="${(r*SV*.92).toFixed(1)}" fill="#5f9b62"/>`
+       + `<ellipse class="tree-c" cx="${(X-r*SV*.25).toFixed(1)}" cy="${(T-r*SV*.3).toFixed(1)}" rx="${(r*SV*.55).toFixed(1)}" ry="${(r*SV*.5).toFixed(1)}" fill="#76b276"/>`;
+}
+function lamp(x,y){ const [X,Y] = P(x,y,0), [, T] = P(x,y,.75);
+  return `<line x1="${X}" y1="${Y}" x2="${X}" y2="${T}" stroke="#6b7480" stroke-width="1.4"/><circle cx="${X}" cy="${T}" r="2.2" fill="#e9eef3"/><circle class="lamp" cx="${X}" cy="${T}" r="5.5" fill="url(#glow)"/>`; }
+
+/* =========================================================
+   CÔNG TRÌNH: hình khối từng lô (x, y, rộng, sâu theo đơn vị ô)
+   Mỗi phần tử: k:'box' có ở giai đoạn khung; còn lại chỉ có khi hoàn thiện.
+   ========================================================= */
+const PLOTS = {
+  1:{ fp:[1.4,1.4,3.6,3.3], items:[
+      {k:'box', a:[1.7,1.7,0,3.1,2.3,1.3], c:'#eadfca', win:{l:[5,2], r:[4,2]}},
+      {k:'roof', f:()=>gableX(1.6,1.6,1.3,3.3,2.5,.62,'#6d8197')},
+      {k:'d', f:()=>box(1.9,4.0,0,2.7,.5,.14,'#cfc6b4')},
+      {k:'d', f:()=>[2.05,2.55,3.05,3.55,4.05,4.45].map(u=>box(u,4.2,.14,.13,.13,1.0,'#f4efe4')).join('')},
+      {k:'d', f:()=>box(1.9,4.0,1.14,2.7,.5,.16,'#e3d8c3')},
+      {k:'d', f:()=>gableY(1.9,4.0,1.3,2.7,.5,.0001,'#e3d8c3')}
+    ], trees:[[1.2,4.9],[5.0,1.1]] },
+  2:{ fp:[8.4,0.6,4.2,3.1], items:[
+      {k:'box', a:[8.7,0.9,0,3.3,2.4,1.0], c:'#c4825f', win:{l:[7,1], r:[5,1]}},
+      {k:'roof', f:()=>[0,1,2].map(i=>gableY(8.7+i*1.1,0.9,1.0,1.1,2.4,.45,'#8b96a3')).join('')},
+      {k:'box', a:[9.05,0.95,1.0,.34,.34,1.6], c:'#a7654a'},
+      {k:'box', a:[9.75,0.95,1.0,.3,.3,1.3], c:'#a7654a'},
+      {k:'d', f:()=>{ const [X,Y] = P(9.22,1.12,2.75), [X2,Y2] = P(9.9,1.1,2.4); return `<circle class="smoke" cx="${X}" cy="${Y-6}" r="6"/><circle class="smoke" style="animation-delay:1.1s" cx="${X+5}" cy="${Y-10}" r="5"/><circle class="smoke" style="animation-delay:.5s" cx="${X2}" cy="${Y2-6}" r="5"/>`; }}
+    ], trees:[[13.2,0.7],[13.3,2.8]] },
+  3:{ fp:[5.4,5.4,3.2,3.2], items:[
+      {k:'box', a:[5.5,5.5,0,3,3,.1], c:'#d8d0c0'},
+      {k:'d', f:()=>poly([[6.0,6.0,.11],[8.0,6.0,.11],[8.0,8.0,.11],[6.0,8.0,.11]], '#cbc2b0')},
+      {k:'d', f:()=>[[5.7,5.7],[7,5.6],[8.3,5.7],[8.4,7],[8.3,8.3],[7,8.4],[5.7,8.3],[5.6,7]].map(([a,b])=>lamp(a,b)).join('')},
+      {k:'box', a:[6.8,6.8,.1,.4,.4,2.1], c:'#ede7da'},
+      {k:'d', f:()=>pyr(6.8,6.8,2.2,.4,.4,.4,'#d9cfbb')},
+      {k:'d', f:()=>{ const [X,Y] = P(7,7,2.95); return `<polygon points="${starPts(X,Y,9,3.7)}" fill="#f2b632" stroke="#b7860b" stroke-width=".8"/>`; }}
+    ], trees:[] },
+  4:{ fp:[0.9,8.2,4.0,3.0], items:[
+      {k:'box', a:[1.1,8.4,0,3.6,2.5,1.0], c:'#efeae0', win:{l:[8,1], r:[5,1]}},
+      {k:'box', a:[2.2,8.9,1.0,1.4,1.4,.55], c:'#e6e0d3', win:{l:[3,1], r:[3,1]}},
+      {k:'d', f:()=>dome(2.9,9.6,1.55,.62,'#8fb3a3')},
+      {k:'d', f:()=>flag(2.9,9.6,2.25,1.0,'#da251d')},
+      {k:'d', f:()=>box(2.2,10.9,0,1.4,.42,.16,'#cfc6b4')},
+      {k:'d', f:()=>[2.35,2.75,3.15,3.5].map(u=>box(u,10.92,.16,.12,.12,.84,'#f6f2ea')).join('')},
+      {k:'d', f:()=>box(2.2,10.85,1.0,1.4,.5,.12,'#e6e0d3')}
+    ], trees:[[0.6,7.9],[5.3,10.6]] },
+  5:{ fp:[8.2,3.9,5.2,2.4], items:[
+      {k:'box', a:[8.4,4.2,0,1.3,1.7,.9], c:'#c4825f', win:{l:[3,1], r:[3,1]}},
+      {k:'roof', f:()=>gableY(8.35,4.15,.9,1.4,1.8,.4,'#8b96a3')},
+      {k:'d', f:()=>field(10.0,4.1,1.6,2.0,'#a9c97a','#8db35f')},
+      {k:'box', a:[10.9,4.35,0,.65,.6,.5], c:'#d7ad62'},
+      {k:'roof', f:()=>gableX(10.85,4.3,.5,.75,.7,.35,'#9c5b3c')},
+      {k:'box', a:[12.0,4.2,0,1.15,1.7,1.35], c:'#dde6ee', win:{l:[3,3], r:[4,3]}},
+      {k:'d', f:()=>{ const [X,Y] = P(12.55,5.0,1.35); return `<ellipse class="f" cx="${X}" cy="${Y-8}" rx="9" ry="5" fill="#f4f6f8" transform="rotate(-25 ${X} ${Y-8})"/><line x1="${X}" y1="${Y}" x2="${X}" y2="${Y-8}" stroke="#8a8f96" stroke-width="1.4"/>`; }}
+    ], trees:[[13.4,4.0]] },
+  6:{ fp:[0.8,11.7,5.3,2.25], items:[
+      {k:'d', f:()=>[[1.15,12.05],[2.45,12.05],[1.15,13.15],[2.45,13.15]].map(([a,b])=>box(a,b,0,.1,.1,.5,'#6e5136')).join('')},
+      {k:'box', a:[1.0,11.9,.5,1.6,1.4,.55], c:'#a97b4f', win:{l:[2,1], r:[2,1]}},
+      {k:'roof', f:()=>gableX(0.9,11.8,1.05,1.8,1.6,.75,'#7a6a48')},
+      {k:'box', a:[2.95,11.9,0,1.1,1.1,.6], c:'#e9d6aa'},
+      {k:'roof', f:()=>pyr(2.8,11.75,.6,1.4,1.4,.38,'#a3402f')},
+      {k:'d', f:()=>box(3.2,12.15,.98,.6,.6,.35,'#e9d6aa')+pyr(3.08,12.03,1.33,.84,.84,.3,'#a3402f')},
+      {k:'box', a:[4.4,12,0,.95,1.5,.9], c:'#efe9df', win:{l:[2,1], r:[3,1]}},
+      {k:'roof', f:()=>gableY(4.35,11.95,.9,1.05,1.6,.45,'#7c8794')},
+      {k:'box', a:[4.55,13.45,0,.65,.5,1.55], c:'#f3eee6'},
+      {k:'d', f:()=>pyr(4.55,13.45,1.55,.65,.5,.75,'#7c8794')}
+    ], trees:[[0.6,14],[5.9,12.6]] },
+  7:{ fp:[8.4,8.4,4.6,4.4], items:[
+      ...[[8.6,1.5,'#f1d4a1'],[9.6,1.8,'#bcd6c6'],[10.6,1.3,'#f0b8a3'],[11.6,1.65,'#c8d3ea']].map(([x,h,c])=>({k:'box', a:[x,8.7,0,.95,1.5,h], c, win:{l:[1,Math.round(h/.45)], r:[2,Math.round(h/.45)]}})),
+      {k:'d', f:()=>[[8.6,1.5],[9.6,1.8],[10.6,1.3],[11.6,1.65]].map(([x,h])=>box(x+.15,10.2,h*.5,.65,.22,.06,'#ffffff')+box(x,8.7,h,.95,1.5,.08,'#e2ddd2')).join('')},
+      {k:'d', f:()=>field(8.7,11.0,4.0,1.5,'#9cc58a','#8ab977')},
+      {k:'d', f:()=>box(10.3,11.6,0,.9,.25,.18,'#9a6b47')}
+    ], trees:[[9.0,12.0],[12.3,11.7],[12.8,9.0]] }
+};
+const EXTRA_TREES = [[0.6,0.6],[5.8,0.7],[5.9,3.6],[0.6,5.7],[13.5,6.0],[5.9,9.4],[6.0,13.4],[8.2,13.5],[13.5,13.4],[0.5,10.6]];
+
+function buildingSVG(id, stage){
+  const B = PLOTS[id], [fx,fy,fw,fd] = B.fp;
+  let s = '';
+  if(stage === 0){
+    s += poly([[fx,fy,0],[fx+fw,fy,0],[fx+fw,fy+fd,0],[fx,fy+fd,0]], 'none', 'pad');
+    B.items.filter(it => it.k === 'box').forEach(it => s += wire(...it.a));
+    return s;
+  }
+  s += poly([[fx,fy,0],[fx+fw,fy,0],[fx+fw,fy+fd,0],[fx,fy+fd,0]], 'none', 'pad');
+  if(stage === 1){
+    s += box(fx+.1, fy+.1, 0, fw-.2, fd-.2, .12, '#a3acb6');
+    B.items.filter(it => it.k === 'box').forEach(it => s += wire(...it.a));
+    return s;
+  }
+  if(stage === 2){
+    s += box(fx+.1, fy+.1, 0, fw-.2, fd-.2, .08, '#a3acb6');
+    B.items.filter(it => it.k === 'box').forEach(it => { const [x,y,z,w,d,h] = it.a; s += box(x,y,z,w,d,h,'#bcc2ca') + scaffold(x,y,z,w,d,h); });
+    return s;
+  }
+  B.items.forEach(it => { s += it.k === 'box' ? box(...it.a, it.c, {win:it.win}) : it.f(); });
+  return s;
+}
+
+/* =========================================================
+   VẼ BẢN ĐỒ
+   ========================================================= */
+const svg = document.getElementById('map');
+svg.setAttribute('viewBox', `0 0 ${W.toFixed(0)} ${H.toFixed(0)}`);
+let selected = 0, justBuilt = 0;
+
+function drawMap(){
+  let s = `<defs><radialGradient id="glow"><stop offset="0" stop-color="#ffe9a3" stop-opacity=".85"/><stop offset=".35" stop-color="#ffd66b" stop-opacity=".45"/><stop offset="1" stop-color="#ffe9a3" stop-opacity="0"/></radialGradient></defs>`;
+  s += poly([[0,0,0],[N,0,0],[N,N,0],[0,N,0]], 'none', 'plate');
+  for(let i=1;i<N;i++){ const a = P(i,0), b = P(i,N), c = P(0,i), d = P(N,i);
+    s += `<line class="gridln" x1="${a[0].toFixed(1)}" y1="${a[1].toFixed(1)}" x2="${b[0].toFixed(1)}" y2="${b[1].toFixed(1)}"/><line class="gridln" x1="${c[0].toFixed(1)}" y1="${c[1].toFixed(1)}" x2="${d[0].toFixed(1)}" y2="${d[1].toFixed(1)}"/>`; }
+  s += poly([[6.5,0,0],[7.5,0,0],[7.5,N,0],[6.5,N,0]], 'none', 'road');
+  s += poly([[0,6.5,0],[N,6.5,0],[N,7.5,0],[0,7.5,0]], 'none', 'road');
+  [[[7,0],[7,5.4]],[[7,8.6],[7,N]],[[0,7],[5.4,7]],[[8.6,7],[N,7]]].forEach(([a,b]) => { const A = P(a[0],a[1],.01), B2 = P(b[0],b[1],.01); s += `<line class="roadmark" x1="${A[0].toFixed(1)}" y1="${A[1].toFixed(1)}" x2="${B2[0].toFixed(1)}" y2="${B2[1].toFixed(1)}"/>`; });
+  /* vẽ theo thứ tự xa đến gần: lô, cây */
+  const items = [];
+  LOTS.forEach(l => { const [fx,fy,fw,fd] = PLOTS[l.id].fp; items.push({d: fx + fy + (fw+fd)*.5, t:'lot', id:l.id}); PLOTS[l.id].trees.forEach(([x,y]) => items.push({d:x+y, t:'tree', x, y})); });
+  EXTRA_TREES.forEach(([x,y]) => items.push({d:x+y, t:'tree', x, y}));
+  items.sort((a,b) => a.d - b.d);
+  items.forEach(it => {
+    if(it.t === 'tree'){ s += tree(it.x, it.y); return; }
+    const id = it.id, st = S.stage[id], L = LOTS.find(l => l.id === id);
+    s += `<g class="plot${selected===id?' sel':''}" data-id="${id}" tabindex="0" role="button" aria-label="Lô ${id}: ${L.name}, ${st>=3?'đã hoàn thành':st>0?'đang xây giai đoạn '+st+'/3':'chưa xây'}"><g class="${justBuilt===id?'just-built':''}">${buildingSVG(id, st)}</g></g>`;
+  });
+  /* ghim số lô ở lớp trên cùng */
+  LOTS.forEach(l => {
+    const [fx,fy,fw,fd] = PLOTS[l.id].fp, st = S.stage[l.id];
+    const topZ = Math.max(...PLOTS[l.id].items.filter(i=>i.k==='box').map(i => i.a[2] + i.a[5])) + (st>=3 ? .9 : .6);
+    const [X,Y] = P(fx+fw/2, fy+fd/2, st >= 2 ? topZ : .6);
+    const col = st >= 3 ? 'var(--ok)' : st > 0 ? '#d49a12' : 'var(--blue)';
+    const label = l.name, tw = label.length * 6.6 + 16;
+    s += `<g class="plot pin-g${selected===l.id?' sel':''}" data-id="${l.id}"><g class="pin"><line x1="${X}" y1="${Y+12}" x2="${X}" y2="${Y+22}" stroke="${col}" stroke-width="2"/><circle cx="${X}" cy="${Y}" r="13" fill="${col}"/><text x="${X}" y="${Y+5}">${st>=3?'✓':l.id}</text>`
+       + `<g class="tag"><rect x="${(X-tw/2).toFixed(1)}" y="${Y-40}" width="${tw.toFixed(1)}" height="20" rx="3"/><text x="${X}" y="${Y-25.5}">${label.toUpperCase()}</text></g></g></g>`;
+  });
+  svg.innerHTML = s;
+  svg.classList.toggle('night', builtCount() === LOTS.length); svg.parentNode.classList.toggle('night', builtCount() === LOTS.length);
+  svg.querySelectorAll('.plot').forEach(g => {
+    g.addEventListener('click', () => select(+g.dataset.id));
+    g.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' '){ e.preventDefault(); select(+g.dataset.id); } });
+  });
+  justBuilt = 0;
+}
+
+/* =========================================================
+   PHIẾU HỒ SƠ
+   ========================================================= */
+const sheet = document.getElementById('sheet');
+let tab = 'build', answered = null;
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function header(){
+  const n = builtCount(), bar = document.getElementById('pbar');
+  bar.innerHTML = LOTS.map(l => `<i class="${S.stage[l.id]>=3?'done':S.stage[l.id]>0?'half':''}"></i>`).join('');
+  document.getElementById('ptext').textContent = n + '/7 công trình';
+}
+
+function lotList(){
+  return '<ul class="list">' + LOTS.map(l => { const st = S.stage[l.id];
+    return `<li><button type="button" data-go="${l.id}"><span class="n">${l.id}</span><span>${esc(l.name)}<br><small style="color:var(--muted)">${esc(l.chap.split(' · ')[1])}</small></span><span class="st ${st>=3?'done':st>0?'half':''}">${st>=3?'Xong':st>0?st+'/3':'Lô trống'}</span></button></li>`; }).join('') + '</ul>';
+}
+
+function renderIntro(){
+  if(builtCount() === LOTS.length) return renderDone();
+  sheet.innerHTML = `<div class="intro"><div class="kicker">Hồ sơ dự án</div><h2>Xây phố thời kỳ quá độ</h2>
+    <p>Bản đồ có 7 lô đất, mỗi lô là một chương của giáo trình Chủ nghĩa xã hội khoa học. Chọn một lô, đọc phần kiến thức nền móng, rồi trả lời đúng 3 câu hỏi để đi từ móng, lên khung, đến hoàn thiện.</p>
+    <p>Trả lời sai không mất gì: đọc giải thích rồi thử câu khác. Xây đủ 7 công trình thì phố lên đèn.</p></div>${lotList()}`;
+  bindList();
+}
+
+function renderLot(){
+  const L = LOTS.find(l => l.id === selected), st = S.stage[L.id];
+  let body = '';
+  if(tab === 'facts'){
+    body = '<ul class="facts">' + L.facts.map(([t,p]) => `<li>${esc(t)} <small>${p}</small></li>`).join('') + '</ul><div class="act"><button class="btn" type="button" id="toBuild">Sang thi công</button></div>';
+  } else if(st >= 3){
+    body = `<p>Công trình đã hoàn thiện. Bạn có thể xem lại phần kiến thức nền móng hoặc chọn lô khác.</p><div class="act"><button class="btn" type="button" id="nextLot">Lô tiếp theo</button><button class="btn alt" type="button" id="toList">Danh sách lô</button></div>`;
+  } else {
+    const q = L.qs[S.ptr[L.id] % L.qs.length];
+    body = `<div class="q"><div class="qn">Thi công giai đoạn ${st+1}: ${STAGE_NAMES[st]}</div><h3>${esc(q.q)}</h3><div class="opts">` +
+      q.o.map((o,i) => `<button type="button" data-o="${i}"><b>${'ABCD'[i]}</b><span>${esc(o)}</span></button>`).join('') + '</div><div id="fb"></div></div>';
+  }
+  sheet.innerHTML = `<div class="kicker">Lô ${L.id} · ${st>=3?'Đã nghiệm thu':st>0?'Đang thi công':'Lô trống'}</div><h2>${esc(L.name)}</h2><div class="chap">${esc(L.chap)}</div>
+    <div class="stages">${STAGE_NAMES.map((n,i) => `<div class="${i<st?'done':i===st?'on':''}">${i+1}. ${n}</div>`).join('')}</div>
+    <div class="tabs" role="tablist"><button type="button" class="${tab==='build'?'on':''}" data-tab="build">Thi công</button><button type="button" class="${tab==='facts'?'on':''}" data-tab="facts">Kiến thức nền móng</button><button type="button" data-tab="list">Tất cả các lô</button></div>${body}`;
+  sheet.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { if(b.dataset.tab === 'list'){ selected = 0; drawMap(); renderIntro(); return; } tab = b.dataset.tab; renderLot(); });
+  const tb = document.getElementById('toBuild'); if(tb) tb.onclick = () => { tab = 'build'; renderLot(); };
+  const nl = document.getElementById('nextLot'); if(nl) nl.onclick = () => { const nx = LOTS.find(l => S.stage[l.id] < 3); if(nx) select(nx.id); else renderDone(); };
+  const tl = document.getElementById('toList'); if(tl) tl.onclick = () => { selected = 0; drawMap(); renderIntro(); };
+  sheet.querySelectorAll('[data-o]').forEach(b => b.onclick = () => answer(+b.dataset.o));
+}
+
+function answer(i){
+  const L = LOTS.find(l => l.id === selected), q = L.qs[S.ptr[L.id] % L.qs.length], ok = i === q.a;
+  const btns = sheet.querySelectorAll('[data-o]');
+  btns.forEach((b,k) => { b.disabled = true; if(k === q.a) b.classList.add('right'); else if(k === i) b.classList.add('wrong'); });
+  S.tries[L.id]++; S.ptr[L.id]++;
+  if(ok){ S.right++; S.stage[L.id] = Math.min(3, S.stage[L.id] + 1); justBuilt = L.id; } else S.wrong++;
+  save(); header(); drawMap();
+  const st = S.stage[L.id], done = st >= 3;
+  document.getElementById('fb').innerHTML = `<div class="explain"><b>${ok ? (done ? 'Chính xác. Công trình đã hoàn thiện!' : 'Chính xác. Đã xong giai đoạn ' + STAGE_NAMES[st-1].toLowerCase() + '.') : 'Chưa đúng. Đáp án là ' + 'ABCD'[q.a] + '.'}</b>${esc(q.e)}</div>
+    <div class="act"><button class="btn" type="button" id="go">${ok ? (done ? (builtCount()===LOTS.length ? 'Xem biên bản nghiệm thu' : 'Lô tiếp theo') : 'Thi công tiếp') : 'Thử câu khác'}</button></div>`;
+  document.getElementById('go').onclick = () => {
+    if(done){ if(builtCount() === LOTS.length){ selected = 0; drawMap(); renderDone(); return; } const nx = LOTS.find(l => S.stage[l.id] < 3); select(nx.id); }
+    else renderLot();
+  };
+  document.getElementById('go').focus();
+}
+
+function renderDone(){
+  const rows = LOTS.map(l => `<tr><td>${l.id}. ${esc(l.name)}<br><small style="color:var(--muted)">${esc(l.chap.split(' · ')[1])}</small></td><td>${S.tries[l.id]} lượt</td></tr>`).join('');
+  sheet.innerHTML = `<div class="kicker">Đã hoàn thành</div><h2>Phố Quá Độ lên đèn</h2>
+    <p class="chap">Bạn đã xây đủ 7 công trình với ${S.right} câu đúng và ${S.wrong} câu sai.</p>
+    <div class="report"><h3>Biên bản nghiệm thu</h3><table>${rows}</table></div>
+    <div class="plaque"><h3>Tấm bia ở Quảng trường Quá Độ</h3><p style="font-size:.88rem;opacity:.85;margin-top:6px">8 đặc trưng của chủ nghĩa xã hội Việt Nam (Cương lĩnh bổ sung, phát triển năm 2011)</p><ol>${FEATURES_2011.map(f => `<li>${esc(f)}</li>`).join('')}</ol></div>
+    <div class="act"><button class="btn alt" type="button" id="again">Xây lại từ đầu</button></div>`;
+  document.getElementById('again').onclick = reset;
+}
+
+function bindList(){ sheet.querySelectorAll('[data-go]').forEach(b => b.onclick = () => select(+b.dataset.go)); }
+function select(id){ selected = id; tab = 'build'; drawMap(); renderLot(); if(innerWidth <= 960) sheet.scrollIntoView({behavior:'smooth', block:'start'}); }
+function reset(){ S = fresh(); save(); selected = 0; header(); drawMap(); renderIntro(); }
+(function(){ const b = document.getElementById('resetBtn'); let t = null;
+  b.onclick = () => { if(t){ clearTimeout(t); t = null; b.textContent = 'Chơi lại'; reset(); return; }
+    b.textContent = 'Bấm lần nữa để xóa tiến độ'; t = setTimeout(() => { t = null; b.textContent = 'Chơi lại'; }, 3000); }; })();
+
+header(); drawMap(); renderIntro();
+</script>
+
+</body>
+</html>
